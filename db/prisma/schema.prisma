@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum SubscriptionFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum RunStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum OrderStatus {
+  PENDING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// models starts here /......
+model Tenant {
+  id             String         @id @default(uuid())
+  name           String
+  address        String?
+  users          User[]
+  customers      Customer[]
+  products       Product[]
+  subscriptions  Subscription[]
+  orders         Order[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(EMPLOYEE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model Customer {
+  id           String          @id @default(uuid())
+  tenantId     String
+  name         String
+  email        String?
+  phone        String?
+  addresses    Address[]
+  subscriptions Subscription[]
+  orders       Order[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  customerId  String
+  addressLine String
+  city        String?
+  state       String?
+  pincode     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+
+model Product {
+  id               String           @id @default(uuid())
+  tenantId         String
+  name             String
+  type             String?
+  unit             String?
+  price            Float
+  inventoryBatches InventoryBatch[]
+  orderItems       OrderItem[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model InventoryBatch {
+  id         String   @id @default(uuid())
+  productId  String
+  batchNumber String?
+  quantity   Int
+  expiryDate DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Subscription {
+  id               String               @id @default(uuid())
+  customerId       String
+  tenantId         String
+  startDate        DateTime
+  endDate          DateTime?
+  frequency        SubscriptionFrequency @default(DAILY)
+  status           SubscriptionStatus    @default(ACTIVE)
+  subscriptionRuns SubscriptionRun[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model SubscriptionRun {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  runDate        DateTime
+  status         RunStatus    @default(PENDING)
+  orders         Order[]      @relation("SubscriptionRunOrders")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+}
+
+model Order {
+  id                String       @id @default(uuid())
+  subscriptionRunId String?
+  customerId        String
+  tenantId          String
+  totalAmount       Float
+  status            OrderStatus  @default(PENDING)
+  orderItems        OrderItem[]
+  payments          Payment[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  subscriptionRun SubscriptionRun? @relation("SubscriptionRunOrders", fields: [subscriptionRunId], references: [id])
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id          String       @id @default(uuid())
+  orderId     String
+  amount      Float
+  paymentDate DateTime     @default(now())
+  method      PaymentMethod @default(CASH)
+  status      PaymentStatus @default(COMPLETED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+}
